@@ -212,16 +212,16 @@ class Spec:
         #n: 0   bg
         #   1-4 sample 1-4
         #   5   iaea
-        spec_list = sorted(listdir('Data/Spectra_final')[1:])
+        spec_list = sorted(listdir('Data/Spectra_final'))
         spec_list = [spec_list[0]]+spec_list[2:]+[spec_list[1]] #reorder
         #list of spectrum array (channel array, energy array, count array,)
-        self.list = [np.loadtxt(f'Data/Spectra/{path}',delimiter = ',',skiprows = 7,unpack = True) for path in spec_list]
+        self.list = [np.loadtxt(f'Data/Spectra_final/{path}',delimiter = ',',skiprows = 7,unpack = True) for path in spec_list]
         #real time and live time storage
 
         live_time = []
         real_time = []
         for filename in spec_list: 
-            with open(f'Data/Spectra/{filename}',newline = '') as spec_csv:
+            with open(f'Data/Spectra_final/{filename}',newline = '') as spec_csv:
                 spec_reader = csv.reader(spec_csv, delimiter=',')
                 for row in spec_reader:
                     if row[0] == 'Live Time (s)':
@@ -233,9 +233,7 @@ class Spec:
 
         #E (Energy) array
         self.E = self.list[n][1] #keV
-        self.cps = self.list[n][2]/self.live_time[n]
-        #only for samples 1-4
-        self.cps_kg = self.list[n][2]/sample_mass[n-1]
+        
 
         #renormalization of sample 3
         cps_arr = lambda arr: np.concatenate(np.array([self.list[i][2][self.E>2640]/self.live_time[i] for i in arr]))
@@ -246,3 +244,8 @@ class Spec:
         #scale factor error S_err (error propagation of standard error on mean)
         self.S_err = self.S*np.sqrt(np.std(cps_arr(correct_n))**2/len(cps_arr(correct_n))/cps_mean(correct_n)**2
         +np.std(cps_arr([3]))**2/len(cps_arr([3]))/cps_mean([3])**2)
+
+        #corrected cps
+        self.cps = self.list[n][2]/self.live_time[n]*[1,1,1,self.S,1,1][n]
+        #only for samples 1-4
+        self.cps_kg = self.list[n][2]/sample_mass[n-1]
