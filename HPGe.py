@@ -235,10 +235,10 @@ class Spec:
         self.E = self.list[n][1] #keV
         
 
-        #renormalization of sample 3
+        #renormalization of sample 3 (abnormal)
         cps_arr = lambda arr: np.concatenate(np.array([self.list[i][2][self.E>2640]/self.live_time[i] for i in arr]))
         cps_mean = lambda arr: np.mean(cps_arr(arr)) 
-        correct_n = [1,2,4]
+        correct_n = [1,2,4] #sample (normal) numbers
         #scale factor S
         self.S = cps_mean(correct_n)/cps_mean([3])
         #scale factor error S_err (error propagation of standard error on mean)
