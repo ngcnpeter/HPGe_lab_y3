@@ -248,4 +248,4 @@ class Spec:
         #corrected cps
         self.cps = self.list[n][2]/self.live_time[n]*[1,1,1,self.S,1,1][n]
         #only for samples 1-4
-        self.cps_kg = self.list[n][2]/sample_mass[n-1]
+        #self.cps_kg = self.list[n][2]/sample_mass[n-1]
