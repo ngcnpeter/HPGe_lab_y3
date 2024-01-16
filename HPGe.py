@@ -245,11 +245,17 @@ class Spec:
         #only for samples 1-4
         self.cps_kg = self.list[n][2]/sample_mass[n]
     
-    def plot(self):
+    def plot(self,bg = False):
+        '''Plots the labelled nth spectrum
+           For sample spectrum, an extra zoom-in plot for low energy region (<1000keV) is given for clarity
+           bg - True to show background, False to hide background
+                '''
         label_list = ['Background', 'Sample 1', 'Sample 2', 'Sample 3', 'Sample 4','IAEA-385']
         plt.figure(figsize = (16,8))
         plt.yscale('log')
         plt.plot(self.E,self.cps)
+        if bg == True:
+            plt.plot(self.E,self.list[0][2]/self.live_time[0],alpha = 0.5)
         for index, row in  self.df.iterrows():
             idx = int(energy_to_chan(row['nndc_peak_energy']))
             if row['Centroid'] >  ([0] + list(np.full(5,1000)))[self.n] and row['nndc_peak_energy'] != 1630.627 : #Bi214 peak too crowded
@@ -271,6 +277,8 @@ class Spec:
             plt.figure(figsize = (16,8))
             plt.yscale('log')
             plt.plot(self.E[self.E<1000],self.cps[self.E<1000])
+            if bg == True:
+                plt.plot(self.E[self.E<1000],(self.list[0][2]/self.live_time[0])[self.E<1000],alpha = 0.5)
             for index, row in  self.df.iterrows():
                 idx = int(energy_to_chan(row['Centroid']))
                 if row['Centroid'] < 1000:
