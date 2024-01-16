@@ -216,7 +216,8 @@ class Spec:
         #concat all modified peak dataframe
         pk_path_ls = [pk_path_ls[1]] + pk_path_ls[2:] + [pk_path_ls[0]] #reorder such that: bg, sample 1-4, iaea
         self.df = peak_df_new(peak_df('Data/Peaks_final/'+pk_path_ls[n]))
-        sample_mass = np.array([1, 0.427-0.0583, 0.5733-0.0576,0.5399-0.0581,0.5585-0.0581 , 0.005])
+        self.mass =  np.array([1, 0.427-0.0583, 0.5733-0.0576,
+                               0.5399-0.0581,0.5585-0.0581 , 0.05]) #kg, mass of sample, background is treated as 1kg
         
         spec_list = sorted(listdir('Data/Spectra_final'))
         spec_list = [spec_list[0]]+spec_list[2:]+[spec_list[1]] #reorder
@@ -243,7 +244,7 @@ class Spec:
         #corrected cps
         self.cps = self.list[n][2]/self.live_time[n]*[1,1,1,self.S,1,1][n]
         #only for samples 1-4
-        self.cps_kg = self.list[n][2]/sample_mass[n]
+        self.cps_kg = self.list[n][2]/self.mass[n]
     
     def plot(self,bg = False):
         '''Plots the labelled nth spectrum
