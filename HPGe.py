@@ -178,24 +178,12 @@ def live_real_time(path_list):
 class Spectra:
     def __init__(self):
         spec_path_list = sorted(listdir('Data/Spectra')[1:])
-        live_time = []
-        real_time = []
-        for filename in spec_path_list: 
-            with open(f'Data/Spectra/{filename}',newline = '') as spec_csv:
-                spec_reader = csv.reader(spec_csv, delimiter=',')
-                for row in spec_reader:
-                    if row[0] == 'Live Time (s)':
-                        live_time.append(float(row[1]))
-                    if row[0] == 'Real Time (s)':
-                        real_time.append(float(row[1]))
-
         #list of spectra array
         self.list = [np.loadtxt(f'Data/Spectra/{path}',delimiter = ',',skiprows = 7,unpack = True) for path in spec_path_list]
         #x (Energy) array
         self.x = self.list[0][1] #keV
         #real time and live time storage
-        self.live_time = live_time
-        self.real_time = real_time
+        self.live_time,self.real_time  = live_real_time(spec_path_list)
 
         # summary dataframe of spectra
         total_cps = [np.sum(self.list[i][2])/self.live_time[i] for i in range(len(spec_path_list))]
@@ -205,31 +193,37 @@ class Spectra:
                     'Real time/s' : self.real_time,
                     'Total CPS' : total_cps})
 
+
+
+
+def energy_to_chan(x) :
+    '''convert peak energy to channel number (fraction of channel number) using Lynx calibration
+    Lynx calibration: energy = a * Ch^2 + b*Ch + c'''
+    a = 8.387880257e-8
+    b = 0.6775230169
+    c = -0.3439140022
+    return (-b + np.sqrt(b**2-4*a*(c-x)))/2/a
+
 #spectra used in analysis   
 class Spec:
     def __init__(self,n):
-        sample_mass = np.array([0.427-0.0583, 0.5733-0.0576,0.5399-0.0581,0.5585-0.0581 ])
         #n: 0   bg
         #   1-4 sample 1-4
         #   5   iaea
+
+        self.n = n
+        pk_path_ls = sorted(listdir('Data/Peaks_final'))[1:] #peak csv path list
+        #concat all modified peak dataframe
+        pk_path_ls = [pk_path_ls[1]] + pk_path_ls[2:] + [pk_path_ls[0]] #reorder such that: bg, sample 1-4, iaea
+        self.df = peak_df_new(peak_df('Data/Peaks_final/'+pk_path_ls[n]))
+        sample_mass = np.array([1, 0.427-0.0583, 0.5733-0.0576,0.5399-0.0581,0.5585-0.0581 , 0.005])
+        
         spec_list = sorted(listdir('Data/Spectra_final'))
         spec_list = [spec_list[0]]+spec_list[2:]+[spec_list[1]] #reorder
         #list of spectrum array (channel array, energy array, count array,)
         self.list = [np.loadtxt(f'Data/Spectra_final/{path}',delimiter = ',',skiprows = 7,unpack = True) for path in spec_list]
         #real time and live time storage
-
-        live_time = []
-        real_time = []
-        for filename in spec_list: 
-            with open(f'Data/Spectra_final/{filename}',newline = '') as spec_csv:
-                spec_reader = csv.reader(spec_csv, delimiter=',')
-                for row in spec_reader:
-                    if row[0] == 'Live Time (s)':
-                        live_time.append(float(row[1]))
-                    if row[0] == 'Real Time (s)':
-                        real_time.append(float(row[1]))
-        self.live_time = live_time
-        self.real_time = real_time
+        self.live_time,self.real_time  = live_real_time(spec_list)
 
         #E (Energy) array
         self.E = self.list[n][1] #keV
@@ -239,6 +233,7 @@ class Spec:
         cps_arr = lambda arr: np.concatenate(np.array([self.list[i][2][self.E>2640]/self.live_time[i] for i in arr]))
         cps_mean = lambda arr: np.mean(cps_arr(arr)) 
         correct_n = [1,2,4] #sample (normal) numbers
+
         #scale factor S
         self.S = cps_mean(correct_n)/cps_mean([3])
         #scale factor error S_err (error propagation of standard error on mean)
@@ -248,4 +243,48 @@ class Spec:
         #corrected cps
         self.cps = self.list[n][2]/self.live_time[n]*[1,1,1,self.S,1,1][n]
         #only for samples 1-4
-        #self.cps_kg = self.list[n][2]/sample_mass[n-1]
+        self.cps_kg = self.list[n][2]/sample_mass[n]
+    
+    def plot(self):
+        label_list = ['Background', 'Sample 1', 'Sample 2', 'Sample 3', 'Sample 4','IAEA-385']
+        plt.figure(figsize = (16,8))
+        plt.yscale('log')
+        plt.plot(self.E,self.cps)
+        for index, row in  self.df.iterrows():
+            idx = int(energy_to_chan(row['nndc_peak_energy']))
+            if row['Centroid'] >  ([0] + list(np.full(5,1000)))[self.n] and row['nndc_peak_energy'] != 1630.627 : #Bi214 peak too crowded
+                plt.annotate(row['Nuclide']+' '+str(row['nndc_peak_energy']), xy=(row['Centroid'],self.cps[idx]),
+                xytext=(row['Centroid'], 0.01),
+                arrowprops=dict( arrowstyle="->" ),                    
+                rotation=90)
+        plt.annotate('Annihilation 511', xy=(511,0.003),
+                    xytext=(511, 0.01),
+                    arrowprops=dict( arrowstyle="->" ),
+                    rotation=90)
+        plt.ylabel('Counts per second')
+        plt.xlabel('Energy/keV')
+        plt.title(f'{label_list[self.n]} Spectrum')            
+        plt.tight_layout()
+            #plt.savefig(f'Plot Images/{label_list[self.i]} Spectrum.pdf')
+        #plot low energy range
+        if self.n > 0:
+            plt.figure(figsize = (16,8))
+            plt.yscale('log')
+            plt.plot(self.E[self.E<1000],self.cps[self.E<1000])
+            for index, row in  self.df.iterrows():
+                idx = int(energy_to_chan(row['Centroid']))
+                if row['Centroid'] < 1000:
+                    tb = int((1+(-1)**index)/2) #1 or 0 when index is even or odd
+                    y_text = [0.02,0.00015][tb]
+                    plt.annotate(row['Nuclide']+' '+str(row['nndc_peak_energy']), xy=(row['Centroid'],self.cps[idx]),
+                    xytext=(row['Centroid']-5, y_text),
+                    arrowprops=dict( arrowstyle="->" ),
+                    rotation=90)
+            plt.annotate('Annihilation 511', xy=(511,0.008),
+                    xytext=(511, 0.02),
+                    arrowprops=dict( arrowstyle="->" ),
+                    rotation=90)
+            plt.ylabel('Counts per second')
+            plt.xlabel('Energy/keV')
+            plt.title(f'{label_list[self.n]} Spectrum Low Energy')
+            plt.tight_layout()
